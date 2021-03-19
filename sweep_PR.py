@@ -248,7 +248,7 @@ def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_r
 
   print(target_branches)
   for _t_ in target_branches:
-    logger.debug("MR title for target branch %s: '%s'",_t_, _comment_1_ + _t_ + _comment_2_)
+    logger.debug("PR title for target branch %s: '%s'",_t_, _comment_1_ + _t_ + _comment_2_)
 
   # perform cherry-pick to all target branches
   for tbranch in target_branches:
@@ -259,7 +259,7 @@ def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_r
         tbranch_excluded = True
         break
     if tbranch_excluded:
-      logger.info("the MR originates from %s -> skip back sweep to %s", tbranch, tbranch)
+      logger.info("the PR originates from %s -> skip back sweep to %s", tbranch, tbranch)
       continue
 
     failed = False
@@ -267,11 +267,9 @@ def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_r
     # create remote branch for containing the cherry-pick commit
     cherry_pick_branch = "cherry-pick-2-{0}-{1}".format(merge_commit, tbranch)
     try:
-      project.branches.create(
-          {'branch': cherry_pick_branch, 'ref': tbranch})
-    except GitlabCreateError as e:
-      logger.critical("failed to create remote branch '%s' with\n%s",
-                      cherry_pick_branch, e.error_message)
+      repo.create_git_ref(ref='refs/heads/'+cherry_pick_branch, sha=repo.get_branch(tbranch).commit.sha)
+    except GithubException as e:
+      logger.critical("failed to create remote branch '%s' with\n%s", cherry_pick_branch, e.data['message'])
       failed = True
     else:
       # perform cherry-pick
@@ -316,8 +314,7 @@ def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_r
       try:
         new_mr = project.mergerequests.create(mr_data)
       except GitlabCreateError as e:
-        logger.critical("failed to create merge request for '%s' into '%s' with\n%s",
-                        cherry_pick_branch, tbranch, e.error_message)
+        logger.critical("failed to create merge request for '%s' into '%s' with\n%s", cherry_pick_branch, tbranch, e.data['message'])
         failed_branches.add(tbranch)
       else:
         good_branches.add(tbranch)
