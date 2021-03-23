@@ -61,9 +61,9 @@ def list_changed_packages(pr):
 
   return: list of packages
   """
-  changed_files = set([c[p] for c in pr.changes()['changes'] for p in ['old_path', 'new_path']])
+  changed_files = set(c.filename for c in pr.get_files())
   logging.debug("changed files:\n%s", pformat(changed_files, indent=20))
-  return []
+  return changed_files
 
 
 def get_sweep_target_branch_rules(src_branch):
