@@ -228,8 +228,7 @@ def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_r
     logger.debug("----- This is a test run, stop with this MR here ----")
     return
 
-  mr_handle.labels = list(labels)
-  mr_handle.save()
+  mr_handle.set_labels(*labels)
 
   # get initial MR commit title and description
   _, mr_title, _ = execute_command_with_retry('git show {0} --pretty=format:"%s"'.format(merge_commit))
@@ -295,32 +294,21 @@ def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_r
 
       _title_ = _comment_1_ + tbranch + _comment_2_
       # create merge request
-      mr_data = {}
-      mr_data['source_branch'] = cherry_pick_branch
-      mr_data['target_branch'] = tbranch
-      mr_data['title'] = _title_
-      mr_data['description'] = mr_desc
-      mr_data['labels'] = ["sweep:from {0}".format(os.path.basename(source_branch))]
-      mr_data['remove_source_branch'] = True
-      logger.debug("Sweeping MR %d to %s with a title: '%s'",
-                   MR_IID, tbranch, _title_)
-      logger.debug("source_branch:%s: target_branch:%s: title:%s: descr:%s:",
-                   mr_data['source_branch'],
-                   mr_data['target_branch'],
-                   mr_data['title'], mr_data['description'])
-      for l in mr_data['labels']:
-        logger.debug("label: %s", l)
       try:
-        new_mr = project.mergerequests.create(mr_data)
-      except GitlabCreateError as e:
+        pr = repo.create_pull(title=_title_, body=mr_desc, head=cherry_pick_branch, base=tbranch)
+      except GithubException as e:
         logger.critical("failed to create merge request for '%s' into '%s' with\n%s", cherry_pick_branch, tbranch, e.data['message'])
         failed_branches.add(tbranch)
       else:
         good_branches.add(tbranch)
         # adding original author as watcher
-        notification_text = "Adding original author @{0:s} as watcher.".format(
-            original_mr_author)
-        new_mr.notes.create({'body': notification_text})
+        notification_text = "Adding original author @{0:s} as watcher.".format(original_mr_author)
+        pr.create_issue_comment(body=notification_text)
+        pr.add_to_labels("sweep:from {0}".format(os.path.basename(source_branch)))
+        logger.debug("Sweeping MR %d to %s with a title: '%s'", MR_IID, tbranch, _title_)
+        logger.debug("source_branch:%s: target_branch:%s: title:%s: descr:%s:",cherry_pick_branch, tbranch,_title_, mr_desc)
+        for l in pr.get_labels():
+          logger.debug("label: %s", l.name)
 
   # compile comment about sweep results
   if len(target_branches) > 0:
@@ -331,15 +319,13 @@ def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_r
     if failed_branches:
       comment += "\nFailed:\n* " + "\n* ".join(sorted(failed_branches))
       # add label to original MR indicating cherry-pick problem
-      mr_handle.labels = list(set(mr_handle.labels) | {"sweep:failed"})
-      mr_handle.save()
+      mr_handle.add_to_labels("sweep:failed")
 
     # add sweep summary to MR in Gitlab
     try:
-      mr_handle.notes.create({'body': comment})
-    except GitlabCreateError as e:
-      logger.critical(
-          "failed to add comment with sweep summary with\n{0:s}".format(e.error_message))
+      mr_handle.create_issue_comment(body=comment)
+    except GithubException as e:
+      logger.critical("failed to add comment with sweep summary with\n{0:s}".format(e.data['message']))
   return
 
 
