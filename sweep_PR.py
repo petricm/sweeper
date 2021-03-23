@@ -274,7 +274,8 @@ def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_r
       # perform cherry-pick by merging
       try:
         # here this might be done better but don't find a better cherry-pick option !!!
-        repo.merge(cherry_pick_branch, commit.sha, 'cherry pick merge commit {0}'.format(commit.sha))
+        #repo.merge(cherry_pick_branch, commit.sha, 'cherry pick merge commit {0}'.format(commit.sha))
+        repo.merge(cherry_pick_branch, commit.sha)
       except GithubException as e:
         logger.critical("failed to cherry pick merge commit, error: %s", e.data['message'])
         failed = True
