@@ -164,7 +164,7 @@ def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_r
   logger.debug('original_mr_author: %s', original_mr_author)
 
   # handle sweep labels
-  labels = set(label.name for label in pull.get_labels())
+  labels = set(label.name for label in mr_handle.get_labels())
   for l in labels:
     logger.debug('label: %s', l)
 
@@ -202,7 +202,7 @@ def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_r
 
   # get list of affected packages for this MR
   affected_packages = list_changed_packages(mr_handle)
-  logger.debug("MR %d affects the following packages: %r", gMR_IID, affected_packages)
+  logger.debug("MR %d affects the following packages: %r", MR_IID, affected_packages)
 
   # determine set of target branches from rules and affected packages
   for rule, branches in target_branch_rules.items():
@@ -247,7 +247,7 @@ def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_r
 
   print(target_branches)
   for _t_ in target_branches:
-    logger.debug("PR title for target branch %s: '%s'",_t_, _comment_1_ + _t_ + _comment_2_)
+    logger.debug("PR title for target branch %s: '%s'", _t_, _comment_1_ + _t_ + _comment_2_)
 
   # perform cherry-pick to all target branches
   for tbranch in target_branches:
@@ -266,7 +266,7 @@ def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_r
     # create remote branch for containing the cherry-pick commit
     cherry_pick_branch = "cherry-pick-2-{0}-{1}".format(merge_commit, tbranch)
     try:
-      repo.create_git_ref(ref='refs/heads/'+cherry_pick_branch, sha=repo.get_branch(tbranch).commit.sha)
+      repo.create_git_ref(ref='refs/heads/' + cherry_pick_branch, sha=repo.get_branch(tbranch).commit.sha)
     except GithubException as e:
       logger.critical("failed to create remote branch '%s' with\n%s", cherry_pick_branch, e.data['message'])
       failed = True
@@ -274,8 +274,8 @@ def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_r
       # perform cherry-pick by merging
       try:
         # here this might be done better but don't find a better cherry-pick option !!!
-        repo.merge(cherry_pick_branch,commit.sha,'cherry pick merge commit {0}'.format(commit.sha))
-    except GithubException as e:
+        repo.merge(cherry_pick_branch, commit.sha, 'cherry pick merge commit {0}'.format(commit.sha))
+      except GithubException as e:
         logger.critical("failed to cherry pick merge commit, error: %s", e.data['message'])
         failed = True
 
@@ -297,7 +297,8 @@ def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_r
       try:
         pr = repo.create_pull(title=_title_, body=mr_desc, head=cherry_pick_branch, base=tbranch)
       except GithubException as e:
-        logger.critical("failed to create merge request for '%s' into '%s' with\n%s", cherry_pick_branch, tbranch, e.data['message'])
+        logger.critical("failed to create merge request for '%s' into '%s' with\n%s",
+                        cherry_pick_branch, tbranch, e.data['message'])
         failed_branches.add(tbranch)
       else:
         good_branches.add(tbranch)
@@ -306,7 +307,8 @@ def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_r
         pr.create_issue_comment(body=notification_text)
         pr.add_to_labels("sweep:from {0}".format(os.path.basename(source_branch)))
         logger.debug("Sweeping MR %d to %s with a title: '%s'", MR_IID, tbranch, _title_)
-        logger.debug("source_branch:%s: target_branch:%s: title:%s: descr:%s:",cherry_pick_branch, tbranch,_title_, mr_desc)
+        logger.debug("source_branch:%s: target_branch:%s: title:%s: descr:%s:",
+                     cherry_pick_branch, tbranch, _title_, mr_desc)
         for l in pr.get_labels():
           logger.debug("label: %s", l.name)
 
