@@ -272,12 +272,12 @@ def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_r
       logger.critical("failed to create remote branch '%s' with\n%s", cherry_pick_branch, e.data['message'])
       failed = True
     else:
-      # perform cherry-pick
+      # perform cherry-pick by merging
       try:
-        commit.cherry_pick(cherry_pick_branch)
-      except GitlabCherryPickError as e:
-        logger.critical(
-            "failed to cherry pick merge commit, error: %s", e.error_message)
+        # here this might be done better but don't find a better cherry-pick option !!!
+        repo.merge(cherry_pick_branch,commit.sha,'cherry pick merge commit {0}'.format(commit.sha))
+    except GithubException as e:
+        logger.critical("failed to cherry pick merge commit, error: %s", e.data['message'])
         failed = True
 
     # only create MR if cherry-pick succeeded
@@ -300,8 +300,7 @@ def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_r
       mr_data['target_branch'] = tbranch
       mr_data['title'] = _title_
       mr_data['description'] = mr_desc
-      mr_data['labels'] = ["sweep:from {0}".format(
-          os.path.basename(source_branch))]
+      mr_data['labels'] = ["sweep:from {0}".format(os.path.basename(source_branch))]
       mr_data['remove_source_branch'] = True
       logger.debug("Sweeping MR %d to %s with a title: '%s'",
                    MR_IID, tbranch, _title_)
