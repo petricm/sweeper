@@ -242,7 +242,7 @@ def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_r
   else:
     source_branch_strip = 'undefined branch'
 
-  _comment_1_ = 'Sweeping !' + str(MR_IID) + ' from ' + source_branch_strip + ' to '
+  _comment_1_ = 'Sweeping #' + str(MR_IID) + ' from ' + source_branch_strip + ' to '
   _comment_2_ = '.\n' + mr_desc
 
   print(target_branches)
@@ -289,7 +289,7 @@ def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_r
                       "\ngit cherry-pick -m 1 %s"
                       "\ngit status"
                       "\n**********************************************", merge_commit, tbranch, tbranch, merge_commit)
-      failed_branches.add(tbranch)
+      failed_branches.add((tbranch, merge_commit))
     else:
       logger.info("cherry-picked '%s' into '%s'", merge_commit, tbranch)
 
@@ -300,7 +300,7 @@ def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_r
       except GithubException as e:
         logger.critical("failed to create merge request for '%s' into '%s' with\n%s",
                         cherry_pick_branch, tbranch, e.data['message'])
-        failed_branches.add(tbranch)
+        failed_branches.add((tbranch, merge_commit))
       else:
         good_branches.add(tbranch)
         # adding original author as watcher
@@ -320,7 +320,16 @@ def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_r
     if good_branches:
       comment += "\nSuccessful:\n* " + "\n* ".join(sorted(good_branches)) + "\n"
     if failed_branches:
-      comment += "\nFailed:\n* " + "\n* ".join(sorted(failed_branches))
+      comment += "\nFailed:"
+      for failed_branch in failed_branches:
+        comment += "\n* **{0}**".format(failed_branch[0])
+        comment += "\n  cherry-pick {0} into {1} failed".format(failed_branch[1],failed_branch[0])
+        comment += "\n  check merge conflicts on a local copy of this repository"
+        comment += "\n  ```"
+        comment += "\n  git checkout {0}".format(failed_branch[0])
+        comment += "\n  git cherry-pick -m 1 {0}".format(failed_branch[1])
+        comment += "\n  git status"
+        comment += "\n  ```"
       # add label to original MR indicating cherry-pick problem
       mr_handle.add_to_labels("sweep:failed")
 
