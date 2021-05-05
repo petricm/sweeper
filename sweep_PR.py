@@ -24,7 +24,7 @@ import github
 from github.GithubException import GithubException
 
 
-def execute_command_with_retry(cmd, max_attempts=1, logger=logging):
+def executeCommandWithRetry(cmd, max_attempts=1, logger=logging):
   logger.debug('working directory: %s', os.getcwd())
   logger.debug("running command '%s' with max attempts %d", cmd, max_attempts)
   attempt = 0
@@ -66,9 +66,9 @@ def list_changed_packages(pr):
   return changed_files
 
 
-def get_sweep_target_branch_rules(src_branch):
+def getSweepTargetBranchRules(src_branch):
   git_cmd = "git show {0}:Sweep/config.yaml".format(src_branch)
-  status, out, _ = execute_command_with_retry(git_cmd)
+  status, out, _ = executeCommandWithRetry(git_cmd)
 
   # bail out in case of errors
   if status != 0:
@@ -100,10 +100,10 @@ def get_sweep_target_branch_rules(src_branch):
   return target_branch_rules
 
 
-def get_list_of_merge_commits(branch, since, until):
+def getListOfMergeCommits(branch, since, until):
   logging.info("looking for merge commits on '%s' since '%s'", branch, since)
   git_cmd = 'git log --merges --first-parent --oneline --since="{0}" --until="{1}" {2}'.format(since, until, branch)
-  status, out, _ = execute_command_with_retry(git_cmd)
+  status, out, _ = executeCommandWithRetry(git_cmd)
 
   # bail out in case of errors
   if status != 0:
@@ -127,7 +127,7 @@ def get_list_of_merge_commits(branch, since, until):
   return hash_list
 
 
-def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_run=False):
+def cherryPickMr(merge_commit, source_branch, target_branch_rules, repo, dry_run=False):
     # keep track of successful and failed cherry-picks
   logger = logging.getLogger('merge commit %s' % merge_commit)
   good_branches = set()
@@ -141,7 +141,7 @@ def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_r
     return
 
   # get pull request ID from commit message
-  _, out, _ = execute_command_with_retry("git show {0}".format(merge_commit), logger=logger)
+  _, out, _ = executeCommandWithRetry("git show {0}".format(merge_commit), logger=logger)
   match = re.search("Merge pull request #(\\d+)", out)
   if match:
     MR_IID = int(match.group(1))
@@ -231,8 +231,8 @@ def cherry_pick_mr(merge_commit, source_branch, target_branch_rules, repo, dry_r
   mr_handle.set_labels(*labels)
 
   # get initial MR commit title and description
-  _, mr_title, _ = execute_command_with_retry('git show {0} --pretty=format:"%s"'.format(merge_commit))
-  _, mr_desc, _ = execute_command_with_retry('git show {0} --pretty=format:"%b"'.format(merge_commit))
+  _, mr_title, _ = executeCommandWithRetry('git show {0} --pretty=format:"%s"'.format(merge_commit))
+  _, mr_desc, _ = executeCommandWithRetry('git show {0} --pretty=format:"%b"'.format(merge_commit))
 
   _s_ = source_branch.split('/')
   if len(_s_) == 2:
@@ -420,7 +420,7 @@ def main():
   os.chdir(workdir)
 
   # fetch latest changes
-  status, _, _ = execute_command_with_retry("git fetch --prune {0}".format(args.remote_name))
+  status, _, _ = executeCommandWithRetry("git fetch --prune {0}".format(args.remote_name))
   if status != 0:
     logging.critical("failed to fetch from '%s'", args.remote_name)
     return None
@@ -428,13 +428,13 @@ def main():
   # get list of branches PRs should be forwarded to
   # this lets one set which branches to target based on changed files or other criteria
   # currently not used
-  target_branch_rules = get_sweep_target_branch_rules(args.branch)
+  target_branch_rules = getSweepTargetBranchRules(args.branch)
   if not target_branch_rules:
     logging.info("no sweeping rules for branch '%s' found", args.branch)
     target_branch_rules = {}
 
   # get list of MRs in relevant period
-  MR_list = get_list_of_merge_commits(args.branch, args.since, args.until)
+  MR_list = getListOfMergeCommits(args.branch, args.since, args.until)
   if not MR_list:
     logging.info("no MRs to '%s' found in period from %s until %s", args.branch, args.since, args.until)
     sys.exit(0)
@@ -443,7 +443,7 @@ def main():
   for mr in MR_list:
     logging.debug("")
     logging.debug("===== Next MR: %s ======", mr)
-    cherry_pick_mr(mr, args.branch, target_branch_rules, repo, args.dry_run)
+    cherryPickMr(mr, args.branch, target_branch_rules, repo, args.dry_run)
 
   # change back to initial directory
   os.chdir(current_dir)
