@@ -9,10 +9,10 @@ jobs:
     - uses: actions/checkout@v2
     - name: Check code
       run: |
-      pip3 install -r requirements.txt
-      pip3 install -r flake8
-      echo "RUNNING PYLINT PY3K CHECK"
-      pylint --msg-template="{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}" sweep_PR.py
-      echo ""
-      echo "RUNNING FLAKE8 CHECK"
-      flake8 sweep_PR.py
+        pip3 install -r requirements.txt
+        pip3 install -r flake8
+        echo "RUNNING PYLINT PY3K CHECK"
+        pylint --msg-template="{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}" sweep_PR.py
+        echo ""
+        echo "RUNNING FLAKE8 CHECK"
+        flake8 sweep_PR.py
