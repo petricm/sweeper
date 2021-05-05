@@ -32,7 +32,7 @@ load-plugins=
 #R0903 = Too few public methods (%s/%s)
 #C0326 = bad-whitespace
 #I0011 = locally-disabling
-disable=R0903,C0326,I0011,redefined-variable-type,c-extension-no-member
+disable=R0903,C0326,I0011,redefined-variable-type,c-extension-no-member,C0103
 
 [REPORTS]
 
@@ -177,16 +177,16 @@ max-args=8
 ignored-argument-names=_.*
 
 # Maximum number of locals for function / method body
-max-locals=20
+max-locals=50
 
 # Maximum number of return / yield for function / method body
 max-returns=8
 
 # Maximum number of branch for function / method body
-max-branchs=15
+max-branches=50
 
 # Maximum number of statements in function / method body
-max-statements=50
+max-statements=150
 
 # Maximum number of parents for a class (see R0901).
 max-parents=7

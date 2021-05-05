@@ -70,6 +70,9 @@ def listChangedPackages(pr):
 
 
 def getSweepTargetBranchRules(src_branch):
+  """
+  Load yaml for sweep configuration
+  """
   git_cmd = "git show {0}:Sweep/config.yaml".format(src_branch)
   status, out, _ = executeCommandWithRetry(git_cmd)
 
@@ -80,7 +83,7 @@ def getSweepTargetBranchRules(src_branch):
 
   try:
     CI_config = yaml.safe_load(out)
-  except Exception:
+  except Exception: # pylint: disable=W0703
     logging.critical("failed to interpret the following text as YAML:\n%s", out)
     return None
   if CI_config is None:
@@ -104,6 +107,9 @@ def getSweepTargetBranchRules(src_branch):
 
 
 def getListOfMergeCommits(branch, since, until):
+  """
+  Return list of merge commit in a given time interval
+  """
   logging.info("looking for merge commits on '%s' since '%s'", branch, since)
   git_cmd = 'git log --merges --first-parent --oneline --since="{0}" --until="{1}" {2}'.format(since, until, branch)
   status, out, _ = executeCommandWithRetry(git_cmd)
@@ -131,7 +137,9 @@ def getListOfMergeCommits(branch, since, until):
 
 
 def cherryPickPr(merge_commit, source_branch, target_branch_rules, repo, dry_run=False):
-    # keep track of successful and failed cherry-picks
+  """
+  Try cherry picking into different branch
+  """
   logger = logging.getLogger('merge commit %s' % merge_commit)
   good_branches = set()
   failed_branches = set()
@@ -234,7 +242,6 @@ def cherryPickPr(merge_commit, source_branch, target_branch_rules, repo, dry_run
   pr_handle.set_labels(*labels)
 
   # get initial PR commit title and description
-  _, pr_title, _ = executeCommandWithRetry('git show {0} --pretty=format:"%s"'.format(merge_commit))
   _, pr_desc, _ = executeCommandWithRetry('git show {0} --pretty=format:"%b"'.format(merge_commit))
 
   _s_ = source_branch.split('/')
@@ -343,6 +350,9 @@ def cherryPickPr(merge_commit, source_branch, target_branch_rules, repo, dry_run
 
 
 def main():
+  """
+  main
+  """
   parser = argparse.ArgumentParser(
       description="GitHub pull request sweeper",
       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
