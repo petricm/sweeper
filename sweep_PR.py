@@ -25,6 +25,9 @@ from github.GithubException import GithubException
 
 
 def executeCommandWithRetry(cmd, max_attempts=1, logger=logging):
+  """
+  Execute shell comamnd with possible retry
+  """
   logger.debug('working directory: %s', os.getcwd())
   logger.debug("running command '%s' with max attempts %d", cmd, max_attempts)
   attempt = 0
@@ -53,7 +56,7 @@ def executeCommandWithRetry(cmd, max_attempts=1, logger=logging):
   return status, out, err
 
 
-def list_changed_packages(pr):
+def listChangedPackages(pr):
   """
   See if this can be useful to automatically determine target branches based on changed files
 
@@ -94,7 +97,7 @@ def getSweepTargetBranchRules(src_branch):
     return None
 
   target_branch_rules = CI_config['sweep-targets'][branch_wo_remote]
-  logging.info("read %d sweeping rules for MRs to '%s", len(target_branch_rules), src_branch)
+  logging.info("read %d sweeping rules for PRs to '%s", len(target_branch_rules), src_branch)
   logging.debug("sweeping rules: %r", target_branch_rules)
 
   return target_branch_rules
@@ -127,7 +130,7 @@ def getListOfMergeCommits(branch, since, until):
   return hash_list
 
 
-def cherryPickMr(merge_commit, source_branch, target_branch_rules, repo, dry_run=False):
+def cherryPickPr(merge_commit, source_branch, target_branch_rules, repo, dry_run=False):
     # keep track of successful and failed cherry-picks
   logger = logging.getLogger('merge commit %s' % merge_commit)
   good_branches = set()
@@ -144,27 +147,27 @@ def cherryPickMr(merge_commit, source_branch, target_branch_rules, repo, dry_run
   _, out, _ = executeCommandWithRetry("git show {0}".format(merge_commit), logger=logger)
   match = re.search("Merge pull request #(\\d+)", out)
   if match:
-    MR_IID = int(match.group(1))
-    logger.debug("corresponds to PR ID %d", MR_IID)
+    PR_IID = int(match.group(1))
+    logger.debug("corresponds to PR ID %d", PR_IID)
 
     # retrieve github API object
     try:
-      mr_handle = repo.get_pull(MR_IID)
+      pr_handle = repo.get_pull(PR_IID)
     except GithubException:
       logger.critical("failed to retrieve Gitlab merge request handle")
       return
     else:
       logger.debug("retrieved Github pull request handle")
   else:
-    logger.critical("failed to determine MR IID")
+    logger.critical("failed to determine PR IID")
     return
 
   # save original author so that we can add as watcher
-  original_mr_author = mr_handle.user.login
-  logger.debug('original_mr_author: %s', original_mr_author)
+  original_pr_author = pr_handle.user.login
+  logger.debug('original_pr_author: %s', original_pr_author)
 
   # handle sweep labels
-  labels = set(label.name for label in mr_handle.get_labels())
+  labels = set(label.name for label in pr_handle.get_labels())
   for l in labels:
     logger.debug('label: %s', l)
 
@@ -200,9 +203,9 @@ def cherryPickMr(merge_commit, source_branch, target_branch_rules, repo, dry_run
       else:
         logger.warning("has empty 'alsoTargeting:' label -> ignore")
 
-  # get list of affected packages for this MR
-  affected_packages = list_changed_packages(mr_handle)
-  logger.debug("MR %d affects the following packages: %r", MR_IID, affected_packages)
+  # get list of affected packages for this PR
+  affected_packages = listChangedPackages(pr_handle)
+  logger.debug("PR %d affects the following packages: %r", PR_IID, affected_packages)
 
   # determine set of target branches from rules and affected packages
   for rule, branches in target_branch_rules.items():
@@ -216,23 +219,23 @@ def cherryPickMr(merge_commit, source_branch, target_branch_rules, repo, dry_run
     else:
       logging.debug("skip branches for rule '%s': %s", rule, branches)
 
-  logger.info("MR %d is swept to %d branches: %r", MR_IID, len(target_branches), list(target_branches))
+  logger.info("PR %d is swept to %d branches: %r", PR_IID, len(target_branches), list(target_branches))
 
   if len(target_branches) == 0:
     labels.add("sweep:ignore")
-    logger.debug("Zero target branches found, adding sweep:ignore label to the MR handle")
+    logger.debug("Zero target branches found, adding sweep:ignore label to the PR handle")
   else:
     labels.add("sweep:done")
 
   if dry_run:
-    logger.debug("----- This is a test run, stop with this MR here ----")
+    logger.debug("----- This is a test run, stop with this PR here ----")
     return
 
-  mr_handle.set_labels(*labels)
+  pr_handle.set_labels(*labels)
 
-  # get initial MR commit title and description
-  _, mr_title, _ = executeCommandWithRetry('git show {0} --pretty=format:"%s"'.format(merge_commit))
-  _, mr_desc, _ = executeCommandWithRetry('git show {0} --pretty=format:"%b"'.format(merge_commit))
+  # get initial PR commit title and description
+  _, pr_title, _ = executeCommandWithRetry('git show {0} --pretty=format:"%s"'.format(merge_commit))
+  _, pr_desc, _ = executeCommandWithRetry('git show {0} --pretty=format:"%b"'.format(merge_commit))
 
   _s_ = source_branch.split('/')
   if len(_s_) == 2:
@@ -242,8 +245,8 @@ def cherryPickMr(merge_commit, source_branch, target_branch_rules, repo, dry_run
   else:
     source_branch_strip = 'undefined branch'
 
-  _comment_1_ = 'Sweeping #' + str(MR_IID) + ' from ' + source_branch_strip + ' to '
-  _comment_2_ = '.\n' + mr_desc
+  _comment_1_ = 'Sweeping #' + str(PR_IID) + ' from ' + source_branch_strip + ' to '
+  _comment_2_ = '.\n' + pr_desc
 
   print(target_branches)
   for _t_ in target_branches:
@@ -280,7 +283,7 @@ def cherryPickMr(merge_commit, source_branch, target_branch_rules, repo, dry_run
         logger.critical("failed to cherry pick merge commit, error: %s", e.data['message'])
         failed = True
 
-    # only create MR if cherry-pick succeeded
+    # only create PR if cherry-pick succeeded
     if failed:
       logger.critical("Failed to cherry-pick '%s' into '%s':"
                       "\n***** Hint: check merge conflicts on a local copy of this repository"
@@ -296,7 +299,7 @@ def cherryPickMr(merge_commit, source_branch, target_branch_rules, repo, dry_run
       _title_ = _comment_1_ + tbranch + _comment_2_
       # create merge request
       try:
-        pr = repo.create_pull(title=_title_, body=mr_desc, head=cherry_pick_branch, base=tbranch)
+        pr = repo.create_pull(title=_title_, body=pr_desc, head=cherry_pick_branch, base=tbranch)
       except GithubException as e:
         logger.critical("failed to create merge request for '%s' into '%s' with\n%s",
                         cherry_pick_branch, tbranch, e.data['message'])
@@ -304,12 +307,12 @@ def cherryPickMr(merge_commit, source_branch, target_branch_rules, repo, dry_run
       else:
         good_branches.add(tbranch)
         # adding original author as watcher
-        notification_text = "Adding original author @{0:s} as watcher.".format(original_mr_author)
+        notification_text = "Adding original author @{0:s} as watcher.".format(original_pr_author)
         pr.create_issue_comment(body=notification_text)
         pr.add_to_labels("sweep:from {0}".format(os.path.basename(source_branch)))
-        logger.debug("Sweeping MR %d to %s with a title: '%s'", MR_IID, tbranch, _title_)
+        logger.debug("Sweeping PR %d to %s with a title: '%s'", PR_IID, tbranch, _title_)
         logger.debug("source_branch:%s: target_branch:%s: title:%s: descr:%s:",
-                     cherry_pick_branch, tbranch, _title_, mr_desc)
+                     cherry_pick_branch, tbranch, _title_, pr_desc)
         for l in pr.get_labels():
           logger.debug("label: %s", l.name)
 
@@ -330,12 +333,12 @@ def cherryPickMr(merge_commit, source_branch, target_branch_rules, repo, dry_run
         comment += "\n  git cherry-pick -m 1 {0}".format(failed_branch[1])
         comment += "\n  git status"
         comment += "\n  ```"
-      # add label to original MR indicating cherry-pick problem
-      mr_handle.add_to_labels("sweep:failed")
+      # add label to original PR indicating cherry-pick problem
+      pr_handle.add_to_labels("sweep:failed")
 
-    # add sweep summary to MR in Gitlab
+    # add sweep summary to PR in Gitlab
     try:
-      mr_handle.create_issue_comment(body=comment)
+      pr_handle.create_issue_comment(body=comment)
     except GithubException as e:
       logger.critical("failed to add comment with sweep summary with\n{0:s}".format(e.data['message']))
   return
@@ -352,11 +355,11 @@ def main():
   parser.add_argument("-p", "--project-name", dest="project_name", required=True,
                       help="GitHub project with namespace (e.g. user/my-project)")
   parser.add_argument("-s", "--since", default="1 month ago",
-                      help="start of time interval for sweeping MR (e.g. 1 week ago)")
+                      help="start of time interval for sweeping PR (e.g. 1 week ago)")
   parser.add_argument("-t", "--token", required=True,
                       help="GitHub Personal Acess Token (PAT)")
   parser.add_argument("-u", "--until", default="now",
-                      help="end of time interval for sweeping MR (e.g. 1 hour ago)")
+                      help="end of time interval for sweeping PR (e.g. 1 hour ago)")
   parser.add_argument(
       "-v",
       "--verbose",
@@ -433,17 +436,17 @@ def main():
     logging.info("no sweeping rules for branch '%s' found", args.branch)
     target_branch_rules = {}
 
-  # get list of MRs in relevant period
-  MR_list = getListOfMergeCommits(args.branch, args.since, args.until)
-  if not MR_list:
-    logging.info("no MRs to '%s' found in period from %s until %s", args.branch, args.since, args.until)
+  # get list of PRs in relevant period
+  PR_list = getListOfMergeCommits(args.branch, args.since, args.until)
+  if not PR_list:
+    logging.info("no PRs to '%s' found in period from %s until %s", args.branch, args.since, args.until)
     sys.exit(0)
 
   # do the actual cherry-picking
-  for mr in MR_list:
+  for pr in PR_list:
     logging.debug("")
-    logging.debug("===== Next MR: %s ======", mr)
-    cherryPickMr(mr, args.branch, target_branch_rules, repo, args.dry_run)
+    logging.debug("===== Next PR: %s ======", pr)
+    cherryPickPr(pr, args.branch, target_branch_rules, repo, args.dry_run)
 
   # change back to initial directory
   os.chdir(current_dir)
