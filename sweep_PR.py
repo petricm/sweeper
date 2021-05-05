@@ -34,7 +34,7 @@ def executeCommandWithRetry(cmd, max_attempts=1, logger=logging):
   while attempt < max_attempts:
     attempt += 1
     logger.debug('running attempt %d', attempt)
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True) # pylint: disable=R1732
     out, err = process.communicate()
     status = process.returncode
     out = out.strip().decode()
