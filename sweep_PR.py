@@ -168,8 +168,8 @@ def cherryPickPr(merge_commit, source_branch, target_branch_rules, repo, dry_run
 
   # handle sweep labels
   labels = set(label.name for label in pr_handle.get_labels())
-  for l in labels:
-    logger.debug('label: %s', l)
+  for label in labels:
+    logger.debug('label: %s', label)
 
   if "sweep:done" in labels:
     logger.info("was already swept -> skipping ......")
@@ -183,19 +183,19 @@ def cherryPickPr(merge_commit, source_branch, target_branch_rules, repo, dry_run
 
   logger.debug("Looking through PR labels .... ")
 
-  for l in labels:
-    logger.debug("label: %s", l)
-    if re.match('^sweptFrom:', l):
-      logger.info("contains %s label -> skipping to prevent sweeping it twice .......\n", l)
+  for label in labels:
+    logger.debug("label: %s", label)
+    if re.match('^sweptFrom:', label):
+      logger.info("contains %s label -> skipping to prevent sweeping it twice .......\n", label)
       return
-    if re.match('^sweep:from ', l):
-      _s_ = l.split(' ')
+    if re.match('^sweep:from ', label):
+      _s_ = label.split(' ')
       if len(_s_) == 2:
         _ss_ = [_s_[1].encode('ascii', 'replace')]
         logger.info("was swept from branch: %s -> excluding %s from the target list", _ss_, _ss_)
         target_branches_exclude.update(_ss_)
-    if re.match('^alsoTargeting:', l):
-      _s_ = l.split(':')
+    if re.match('^alsoTargeting:', label):
+      _s_ = label.split(':')
       if len(_s_) == 2:
         _ss_ = [_s_[1]]
         logger.info("also targets the following branches: %s -> add to target list", _ss_)
@@ -276,8 +276,6 @@ def cherryPickPr(merge_commit, source_branch, target_branch_rules, repo, dry_run
     else:
       # perform cherry-pick by merging
       try:
-        # here this might be done better but don't find a better cherry-pick option !!!
-        #repo.merge(cherry_pick_branch, commit.sha, 'cherry pick merge commit {0}'.format(commit.sha))
         repo.merge(cherry_pick_branch, commit.sha)
       except GithubException as e:
         logger.critical("failed to cherry pick merge commit, error: %s", e.data['message'])
@@ -313,8 +311,8 @@ def cherryPickPr(merge_commit, source_branch, target_branch_rules, repo, dry_run
         logger.debug("Sweeping PR %d to %s with a title: '%s'", PR_IID, tbranch, _title_)
         logger.debug("source_branch:%s: target_branch:%s: title:%s: descr:%s:",
                      cherry_pick_branch, tbranch, _title_, pr_desc)
-        for l in pr.get_labels():
-          logger.debug("label: %s", l.name)
+        for label in pr.get_labels():
+          logger.debug("label: %s", label.name)
 
   # compile comment about sweep results
   if len(target_branches) > 0:
@@ -326,7 +324,7 @@ def cherryPickPr(merge_commit, source_branch, target_branch_rules, repo, dry_run
       comment += "\nFailed:"
       for failed_branch in failed_branches:
         comment += "\n* **{0}**".format(failed_branch[0])
-        comment += "\n  cherry-pick {0} into {1} failed".format(failed_branch[1],failed_branch[0])
+        comment += "\n  cherry-pick {0} into {1} failed".format(failed_branch[1], failed_branch[0])
         comment += "\n  check merge conflicts on a local copy of this repository"
         comment += "\n  ```"
         comment += "\n  git checkout {0}".format(failed_branch[0])
